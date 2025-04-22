@@ -39,6 +39,10 @@ declare const THREE: any;
   let totalDistance = 0;
   let lastGateDistance = 0;
   const gatePool: any[] = [];
+  // Snowman settings
+  const snowmanInterval = 15;     // seconds between snowmen
+  let lastSnowmanTime = 0;
+  const snowmanPool: any[] = [];
   let playerX = 0;
   let playerVx = 0;
   const playerSpeed = 20;
@@ -88,18 +92,36 @@ declare const THREE: any;
     osc2.start(t0 + 0.1);
     osc2.stop(t0 + 0.2);
   }
-  // Play a low thud on tree collision
+  // Play a crash sound: low thud plus high-pitched white noise
   function playCrashSound() {
-    const osc = audioCtx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(60, audioCtx.currentTime);
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-    // Quick decay for thud effect
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    osc.connect(gainNode).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.3);
+    const t0 = audioCtx.currentTime;
+    // Low-frequency thud
+    const thudOsc = audioCtx.createOscillator();
+    thudOsc.type = 'triangle';
+    thudOsc.frequency.setValueAtTime(60, t0);
+    const thudGain = audioCtx.createGain();
+    thudGain.gain.setValueAtTime(0.5, t0);
+    thudGain.gain.exponentialRampToValueAtTime(0.01, t0 + 0.3);
+    thudOsc.connect(thudGain).connect(audioCtx.destination);
+    thudOsc.start(t0);
+    thudOsc.stop(t0 + 0.3);
+    // High-frequency white noise
+    const duration = 0.2;
+    const sampleRate = audioCtx.sampleRate;
+    const bufferSize = sampleRate * duration;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noiseSource = audioCtx.createBufferSource();
+    noiseSource.buffer = noiseBuffer;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.3, t0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, t0 + duration);
+    noiseSource.connect(noiseGain).connect(audioCtx.destination);
+    noiseSource.start(t0);
+    noiseSource.stop(t0 + duration);
   }
   // Play a two-tone rising sound when passing a gate
   function playGateSuccessSound() {
@@ -280,6 +302,25 @@ declare const THREE: any;
     group.add(rightFlag);
     return group;
   }
+  // Create a snowman: two spheres (body and head)
+  function createSnowman() {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+    // Body
+    const body = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), mat);
+    body.position.y = 1;
+    group.add(body);
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), mat);
+    head.position.y = 1 + 1 + 0.7;
+    group.add(head);
+    return group;
+  }
+  // Position the snowman randomly in spawn zone
+  function resetSnowman(sm: any) {
+    sm.position.x = THREE.MathUtils.randFloatSpread(laneWidth * 2);
+    sm.position.z = THREE.MathUtils.randFloat(spawnMinZ, spawnMaxZ);
+  }
 
   function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -337,9 +378,9 @@ declare const THREE: any;
         const dx = tree.position.x - playerX;
         const dz = tree.position.z;
         if (Math.sqrt(dx * dx + dz * dz) < 2) {
-          // Collision with tree: play crash sound and end game
+          // Collision with tree: play crash sound and end game with reason
           playCrashSound();
-          endGame();
+          endGame('You hit a tree!');
         }
       }
     }
@@ -399,9 +440,9 @@ declare const THREE: any;
       if (!gate.userData.passed && gate.position.z < 0) {
         const px = playerX;
         if (px < gate.userData.leftX || px > gate.userData.rightX) {
-          // Missed the gate
+          // Missed the gate: play crash and end game with reason
           playCrashSound();
-          endGame();
+          endGame('Missed a gate!');
         } else {
           // Successful gate pass
           playGateSuccessSound();
@@ -416,6 +457,31 @@ declare const THREE: any;
       }
     }
 
+    // Spawn snowmen periodically
+    if (timeAlive - lastSnowmanTime >= snowmanInterval) {
+      lastSnowmanTime += snowmanInterval;
+      const sm = createSnowman();
+      resetSnowman(sm);
+      scene.add(sm);
+      snowmanPool.push(sm);
+    }
+    // Update snowmen: move, detect collision, and remove
+    for (let i = 0; i < snowmanPool.length; i++) {
+      const sm = snowmanPool[i];
+      sm.position.z -= currentSpeed * dt;
+      if (sm.position.z < -10) {
+        scene.remove(sm);
+        snowmanPool.splice(i, 1);
+        i--;
+        continue;
+      }
+      const dx2 = sm.position.x - playerX;
+      const dz2 = sm.position.z;
+      if (Math.sqrt(dx2 * dx2 + dz2 * dz2) < 1.5) {
+        playCrashSound();
+        endGame('You hit a snowman!');
+      }
+    }
     renderer.render(scene, camera);
   }
 
@@ -453,7 +519,13 @@ declare const THREE: any;
     gatePool.length = 0;
     totalDistance = 0;
     lastGateDistance = 0;
+    // Reset snowmen
+    snowmanPool.forEach(s => scene.remove(s));
+    snowmanPool.length = 0;
+    lastSnowmanTime = 0;
     // Restart animation loop
+    // Clear any previous failure reason
+    failReasonElement.innerText = '';
     animate();
   }
 
