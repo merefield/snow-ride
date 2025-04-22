@@ -43,6 +43,11 @@ body, html {
   font-size: 20px;
   margin-top: 20px;
 }
+/* Failure reason message under Game Over */
+#failReason {
+  margin-top: 10px;
+  font-size: 24px;
+}
 #mobileControls {
   position: absolute;
   bottom: 20px;

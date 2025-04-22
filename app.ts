@@ -12,7 +12,8 @@ declare const THREE: any;
   const treesPerInterval = 2;
   // Track last time density was increased
   let lastDensityIncrease = 0;
-  const boxCount = 20;
+  // Number of red boxes (presents) to spawn (reduced for more scarcity)
+  const boxCount = 8;
   // Horizontal half-width of the forest (player X range and spawn zone half-width)
   // Increased for a much wider forest
   const laneWidth = 50;
@@ -27,6 +28,17 @@ declare const THREE: any;
   const snowCount = 1000;
   const snowFallSpeed = 20;
   let snowParticles: any;
+  // Ski gate settings
+  // Distance between gates along Z-axis (smaller = more frequent)
+  const gateSpacing = 200;        // was 300, now more common
+  const gateSpawnOffset = 50;     // additional Z-offset beyond spawnMaxZ
+  const gateWidth = 15;          // horizontal width between flags
+  const gatePoleHeight = 4;
+  const gatePoleRadius = 0.1;
+  const gateFlagSize = 1;
+  let totalDistance = 0;
+  let lastGateDistance = 0;
+  const gatePool: any[] = [];
   let playerX = 0;
   let playerVx = 0;
   const playerSpeed = 20;
@@ -42,6 +54,7 @@ declare const THREE: any;
   const rightButton = document.getElementById('rightButton')!;
   // High score display element and persisted value
   const highScoreElement = document.getElementById('highScore')!;
+  const failReasonElement = document.getElementById('failReason')!;
   let highScore = 0;
   try {
     highScore = parseInt(localStorage.getItem('highScore') || '0', 10) || 0;
@@ -51,15 +64,29 @@ declare const THREE: any;
   highScoreElement.innerText = `High Score: ${highScore}`;
   // Audio context and success sound for collecting boxes
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  function playSuccessSound() {
-    const osc = audioCtx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    osc.connect(gainNode).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
+  // Play a 'katching' sound when collecting a present
+  function playKatchSound() {
+    const t0 = audioCtx.currentTime;
+    // First tone
+    const osc1 = audioCtx.createOscillator();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(800, t0);
+    const gain1 = audioCtx.createGain();
+    gain1.gain.setValueAtTime(0.2, t0);
+    gain1.gain.exponentialRampToValueAtTime(0.01, t0 + 0.1);
+    osc1.connect(gain1).connect(audioCtx.destination);
+    osc1.start(t0);
+    osc1.stop(t0 + 0.1);
+    // Second tone
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1200, t0 + 0.1);
+    const gain2 = audioCtx.createGain();
+    gain2.gain.setValueAtTime(0.2, t0 + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.01, t0 + 0.2);
+    osc2.connect(gain2).connect(audioCtx.destination);
+    osc2.start(t0 + 0.1);
+    osc2.stop(t0 + 0.2);
   }
   // Play a low thud on tree collision
   function playCrashSound() {
@@ -73,6 +100,22 @@ declare const THREE: any;
     osc.connect(gainNode).connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.3);
+  }
+  // Play a two-tone rising sound when passing a gate
+  function playGateSuccessSound() {
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    const startFreq = 400;
+    const endFreq = 800;
+    osc.frequency.setValueAtTime(startFreq, t0);
+    osc.frequency.linearRampToValueAtTime(endFreq, t0 + 0.3);
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(0.2, t0);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, t0 + 0.3);
+    osc.connect(gainNode).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.3);
   }
 
   const treePool: any[] = [];
@@ -114,12 +157,9 @@ declare const THREE: any;
       treePool.push(tree);
     }
 
+    // Create presents (boxes) with ribbons
     for (let i = 0; i < boxCount; i++) {
-      const box = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshPhongMaterial({ color: 0xff0000 })
-      );
-      box.position.y = 0.5;
+      const box = createPresent();
       resetBox(box);
       scene.add(box);
       box.userData.active = true;
@@ -179,6 +219,66 @@ declare const THREE: any;
     box.position.z = THREE.MathUtils.randFloat(spawnMinZ, spawnMaxZ);
     box.userData.active = true;
     box.visible = true;
+  }
+
+  // Create a present: red box with yellow ribbon cross
+  function createPresent() {
+    const group = new THREE.Group();
+    const boxMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshPhongMaterial({ color: 0xff0000 })
+    );
+    boxMesh.position.y = 0.5;
+    group.add(boxMesh);
+    const ribbonMat = new THREE.MeshPhongMaterial({ color: 0xFFFF00 });
+    // Ribbon along X-axis
+    const ribbonX = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.1, 0.1),
+      ribbonMat
+    );
+    ribbonX.position.set(0, 0.5, 0);
+    group.add(ribbonX);
+    // Ribbon along Z-axis
+    const ribbonZ = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.1, 1.2),
+      ribbonMat
+    );
+    ribbonZ.position.set(0, 0.5, 0);
+    group.add(ribbonZ);
+    return group;
+  }
+  // Create a ski gate: two flags marking a gate the player must pass through
+  function createGate() {
+    // Determine gate center X randomly within lane bounds
+    const halfWidth = gateWidth / 2;
+    const centerX = THREE.MathUtils.randFloatSpread((laneWidth - halfWidth) * 2);
+    const leftX = centerX - halfWidth;
+    const rightX = centerX + halfWidth;
+    const group = new THREE.Group();
+    // Store gate data
+    group.userData = { leftX, rightX, passed: false };
+    // Pole material
+    const poleMat = new THREE.MeshPhongMaterial({ color: 0x654321 });
+    const poleGeo = new THREE.CylinderGeometry(gatePoleRadius, gatePoleRadius, gatePoleHeight);
+    // Left pole
+    const leftPole = new THREE.Mesh(poleGeo, poleMat);
+    leftPole.position.set(leftX, gatePoleHeight / 2, 0);
+    group.add(leftPole);
+    // Right pole
+    const rightPole = new THREE.Mesh(poleGeo, poleMat);
+    rightPole.position.set(rightX, gatePoleHeight / 2, 0);
+    group.add(rightPole);
+    // Flags
+    const flagGeo = new THREE.PlaneGeometry(gateFlagSize, gateFlagSize);
+    // Left flag (bright pink)
+    const leftFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0xFF1493, side: THREE.DoubleSide }));
+    leftFlag.position.set(leftX + gatePoleRadius + 0.01, gatePoleHeight * 0.75, 0);
+    group.add(leftFlag);
+    // Right flag (bright violet)
+    const rightFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0x9400D3, side: THREE.DoubleSide }));
+    rightFlag.position.set(rightX - gatePoleRadius - 0.01, gatePoleHeight * 0.75, 0);
+    group.add(rightFlag);
+    return group;
   }
 
   function onWindowResize() {
@@ -253,8 +353,8 @@ declare const THREE: any;
         const dx = box.position.x - playerX;
         const dz = box.position.z;
         if (Math.sqrt(dx * dx + dz * dz) < 1.5) {
-          // Play success sound on collecting a box
-          playSuccessSound();
+          // Collect present: play katch sound
+          playKatchSound();
           bonusPoints += 10;
           box.userData.active = false;
           box.visible = false;
@@ -281,12 +381,50 @@ declare const THREE: any;
         treePool.push(newTree);
       }
     }
+    // Advance total distance to manage gate spawning
+    totalDistance += currentSpeed * dt;
+    // Spawn a new ski gate at intervals
+    if (totalDistance - lastGateDistance >= gateSpacing) {
+      lastGateDistance += gateSpacing;
+      const gate = createGate();
+      gate.position.z = spawnMaxZ + gateSpawnOffset;
+      scene.add(gate);
+      gatePool.push(gate);
+    }
+    // Update gates: move, check passage, and remove past gates
+    for (let i = 0; i < gatePool.length; i++) {
+      const gate = gatePool[i];
+      gate.position.z -= currentSpeed * dt;
+      // Check if player passes through when gate reaches camera plane
+      if (!gate.userData.passed && gate.position.z < 0) {
+        const px = playerX;
+        if (px < gate.userData.leftX || px > gate.userData.rightX) {
+          // Missed the gate
+          playCrashSound();
+          endGame();
+        } else {
+          // Successful gate pass
+          playGateSuccessSound();
+        }
+        gate.userData.passed = true;
+      }
+      // Remove gates that have moved past view
+      if (gate.position.z < -10) {
+        scene.remove(gate);
+        gatePool.splice(i, 1);
+        i--;
+      }
+    }
 
     renderer.render(scene, camera);
   }
 
-  function endGame() {
+  /** Trigger game over with optional failure reason */
+  function endGame(reason?: string) {
     gameOver = true;
+    if (reason) {
+      failReasonElement.innerText = reason;
+    }
     gameOverElement.classList.remove('hidden');
   }
 
@@ -298,7 +436,7 @@ declare const THREE: any;
     playerX = 0;
     playerVx = 0;
     gameOverElement.classList.add('hidden');
-    // Reset tree density: remove existing trees and re-create initial sparse set
+    // Reset tree density and gates
     treePool.forEach(tree => scene.remove(tree));
     treePool.length = 0;
     lastDensityIncrease = 0;
@@ -308,7 +446,14 @@ declare const THREE: any;
       scene.add(tree);
       treePool.push(tree);
     }
+    // Reset presents
     boxPool.forEach(resetBox);
+    // Reset gates
+    gatePool.forEach(g => scene.remove(g));
+    gatePool.length = 0;
+    totalDistance = 0;
+    lastGateDistance = 0;
+    // Restart animation loop
     animate();
   }
 
