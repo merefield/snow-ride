@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "start": "deno run --allow-net --allow-read --allow-env --allow-write --allow-run server.ts"
+  },
+  "watch": {
+    "patterns": ["\\.ts$", "\\.html$", "\\.css$"],
+    "clear": true
+  }
+}

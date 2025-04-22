@@ -1,0 +1,8 @@
+Server running on http://localhost:8000
+error: Uncaught (in promise) AddrInUse: Address already in use (os error 98)
+    const listener = Deno.listen({
+                          ^
+    at Object.listen (ext:deno_net/01_net.js:536:35)
+    at Server.listenAndServe (https://deno.land/std@0.171.0/http/server.ts:182:27)
+    at serve (https://deno.land/std@0.171.0/http/server.ts:604:20)
+    at file:///home/robert/code/maze-solver/server.ts:5:1
