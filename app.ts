@@ -541,6 +541,8 @@ declare const THREE: any;
       const qualifies = scores.length < 3 || finalScore > scores[scores.length - 1].score;
       // Retrieve stored player name so we only ask once
       const storedName = localStorage.getItem('hsName') || '';
+      console.log('[DEBUG] showHighScoresBoard: retrieved hsName from localStorage:', storedName);
+      console.log('[DEBUG] showHighScoresBoard: retrieved hsName from localStorage:', storedName);
       if (qualifies) {
         if (!storedName) {
           // First-time top-3: prompt for name
@@ -558,7 +560,11 @@ declare const THREE: any;
             if (!name) { alert('Please enter a name'); return; }
             try {
               // Store name locally to avoid re-prompting
+              console.log('[DEBUG] showHighScoresBoard: about to set hsName in localStorage. Old:', localStorage.getItem('hsName'), 'New:', name);
+              console.log('[DEBUG] showHighScoresBoard: about to set hsName in localStorage. Old:', localStorage.getItem('hsName'), 'New:', name);
               localStorage.setItem('hsName', name);
+              console.log('[DEBUG] showHighScoresBoard: localStorage hsName now:', localStorage.getItem('hsName'));
+              console.log('[DEBUG] showHighScoresBoard: localStorage hsName now:', localStorage.getItem('hsName'));
               const postResp = await fetch('/api/high-scores', {
                 method: 'POST',
                 headers: {

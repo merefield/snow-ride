@@ -71,7 +71,9 @@ serve(async (req) => {
       scores = scores.slice(0, 3);
       // Persist updated high-scores
       try {
+        console.log("[DEBUG] server: persisting updated high-scores with data:", JSON.stringify(scores));
         await Deno.writeTextFile("high-scores.yml", stringify(scores));
+        console.log("[DEBUG] server: successfully wrote high-scores.yml");
       } catch (err) {
         console.error("Failed to write high-scores.yml:", err);
       }
