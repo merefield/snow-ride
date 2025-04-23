@@ -405,11 +405,30 @@ declare const THREE: any;
 
     timeAlive += dt;
     const score = Math.floor(timeAlive) + bonusPoints;
-    // Update high score if beaten
+    // Update high score if beaten and provide share link
     if (score > highScore) {
       highScore = score;
       localStorage.setItem('highScore', String(highScore));
       highScoreElement.innerText = `High Score: ${highScore}`;
+      // Create or update share link for new high score
+      try {
+        // Use base game URL for sharing (no querystring)
+        const shareUrl = process.env.URL;
+        let shareLink = document.getElementById('shareLink') as HTMLAnchorElement | null;
+        if (!shareLink) {
+          shareLink = document.createElement('a');
+          shareLink.id = 'shareLink';
+          shareLink.style.display = 'block';
+          shareLink.style.marginTop = '8px';
+          highScoreElement.parentElement?.insertBefore(shareLink, highScoreElement.nextSibling);
+        }
+        // Update link URL, target, and display text with current high score
+        shareLink.href = shareUrl;
+        shareLink.target = '_blank';
+        shareLink.innerText = `See if you can beat my high score: ${score}!`;
+      } catch {
+        // In case process.env.URL is not defined, skip share link
+      }
     }
     scoreElement.innerText = `Score: ${score}`;
     // Gradually increase tree density over time
@@ -487,11 +506,141 @@ declare const THREE: any;
 
   /** Trigger game over with optional failure reason */
   function endGame(reason?: string) {
+    // Prevent multiple endGame invocations (e.g., multiple collisions)
+    if (gameOver) return;
     gameOver = true;
     if (reason) {
       failReasonElement.innerText = reason;
     }
     gameOverElement.classList.remove('hidden');
+    // At game end, display server-side high scores
+    const finalScore = Math.floor(timeAlive) + bonusPoints;
+    showHighScoresBoard(finalScore);
+  }
+
+  // Display high scores and handle new top-3 entries
+  async function showHighScoresBoard(finalScore: number) {
+    // Ensure game-over UI is visible
+    gameOverElement.classList.remove('hidden');
+    const containerId = 'highScoresBoard';
+    let container = document.getElementById(containerId) as HTMLDivElement | null;
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      container.style.textAlign = 'center';
+      container.style.marginTop = '10px';
+      gameOverElement.appendChild(container);
+    } else {
+      container.innerHTML = '';
+    }
+    try {
+      // Fetch existing top-3
+      const resp = await fetch('/api/high-scores');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      let scores: Array<{name: string, score: number}> = await resp.json();
+      const qualifies = scores.length < 3 || finalScore > scores[scores.length - 1].score;
+      // Retrieve stored player name so we only ask once
+      const storedName = localStorage.getItem('hsName') || '';
+      if (qualifies) {
+        if (!storedName) {
+          // First-time top-3: prompt for name
+          const info = document.createElement('div');
+          info.innerText = 'Congratulations! You made the top 3. Enter your name:';
+          container.appendChild(info);
+          const input = document.createElement('input');
+          input.type = 'text';
+          container.appendChild(input);
+          const submitBtn = document.createElement('button');
+          submitBtn.innerText = 'Submit';
+          container.appendChild(submitBtn);
+          submitBtn.addEventListener('click', async () => {
+            const name = input.value.trim();
+            if (!name) { alert('Please enter a name'); return; }
+            try {
+              // Store name locally to avoid re-prompting
+              localStorage.setItem('hsName', name);
+              const postResp = await fetch('/api/high-scores', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-API-Key': process.env.HIGH_SCORES_TOKEN || ''
+                },
+                body: JSON.stringify({ name, score: finalScore }),
+              });
+              if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
+              scores = await postResp.json();
+              renderScoresTable(container, scores);
+              input.disabled = true;
+              submitBtn.disabled = true;
+            } catch (err) {
+              alert('Failed to save score');
+            }
+          });
+        } else {
+          // Returning player: auto-submit new high score
+          const info = document.createElement('div');
+          info.innerText = `Submitting your score as ${storedName}`;
+          container.appendChild(info);
+          try {
+            const postResp = await fetch('/api/high-scores', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': process.env.HIGH_SCORES_TOKEN || ''
+              },
+              body: JSON.stringify({ name: storedName, score: finalScore }),
+            });
+            if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
+            scores = await postResp.json();
+          } catch (err) {
+            alert('Failed to save score');
+          }
+        }
+      }
+      // Render the current top-3
+      renderScoresTable(container, scores);
+    } catch (err) {
+      console.error('Error loading high scores:', err);
+    }
+  }
+
+  // Helper to render scores table
+  function renderScoresTable(container: HTMLElement, scores: Array<{name: string, score: number}>) {
+    let title = container.querySelector('h3');
+    if (!title) {
+      title = document.createElement('h3');
+      title.innerText = 'High Scores';
+      container.appendChild(title);
+    }
+    let table = container.querySelector('table');
+    if (table) {
+      table.remove();
+    }
+    table = document.createElement('table');
+    table.style.margin = '0 auto';
+    // Add table header for clarity
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Rank', 'Name', 'Score'].forEach(text => {
+      const th = document.createElement('th');
+      th.innerText = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    scores.slice(0, 3).forEach((entry, idx) => {
+      const tr = document.createElement('tr');
+      const rankTd = document.createElement('td'); rankTd.innerText = `#${idx + 1}`;
+      const nameTd = document.createElement('td'); nameTd.innerText = entry.name;
+      const scoreTd = document.createElement('td'); scoreTd.innerText = String(entry.score);
+      tr.appendChild(rankTd);
+      tr.appendChild(nameTd);
+      tr.appendChild(scoreTd);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
   }
 
   function resetGame() {

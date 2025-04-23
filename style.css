@@ -76,3 +76,15 @@ body, html {
   font-size: 20px;
   z-index: 1;
 }
+
+/* High Scores Board Table Styling */
+#highScoresBoard table {
+  border-collapse: collapse;
+}
+#highScoresBoard th, #highScoresBoard td {
+  border: 1px solid white;
+  padding: 8px;
+}
+#highScoresBoard th {
+  background: rgba(255,255,255,0.2);
+}
