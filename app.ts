@@ -375,13 +375,19 @@ declare const THREE: any;
       canvas.width = 512;
       canvas.height = 128;
       const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#000000';
+      // Dark blue background for level-completion banners
+      ctx.fillStyle = '#00008B';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.font = 'bold 48px Arial';
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Merefield Technology', canvas.width / 2, canvas.height / 2);
+      // Alternate banner text on every other level gate
+      const levelGateIndex = gatesSpawned / 5;
+      const bannerText = (levelGateIndex % 2 === 0)
+        ? 'https://merefield.tech'
+        : 'Merefield Technology';
+      ctx.fillText(bannerText, canvas.width / 2, canvas.height / 2);
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       const bannerMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
