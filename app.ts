@@ -374,7 +374,8 @@ declare const THREE: any;
       // Dark blue background for level-completion banners
       ctx.fillStyle = '#00008B';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.font = 'bold 48px Arial';
+      // Use larger font for level banner text
+      ctx.font = 'bold 64px Arial';
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -445,8 +446,9 @@ declare const THREE: any;
   }
   // Mobile touch controls: left/right half of screen
   function onTouchStart(e: TouchEvent) {
-    e.preventDefault();
+    // Skip handling (and default blocking) when game is over to allow UI interaction
     if (gameOver) return;
+    e.preventDefault();
     const x = e.touches[0].clientX;
     if (x < window.innerWidth / 2) {
       // Left half => ArrowLeft equivalent
@@ -457,6 +459,8 @@ declare const THREE: any;
     }
   }
   function onTouchEnd(e: TouchEvent) {
+    // Skip handling when game is over to allow UI interaction
+    if (gameOver) return;
     e.preventDefault();
     playerVx = 0;
   }
