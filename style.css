@@ -76,6 +76,17 @@ body, html {
   font-size: 20px;
   z-index: 1;
 }
+/* Level indicator at top-center */
+#level {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-family: Arial, sans-serif;
+  font-size: 20px;
+  z-index: 1;
+}
 
 /* High Scores Board Table Styling */
 #highScoresBoard table {

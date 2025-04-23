@@ -1,13 +1,14 @@
 declare const THREE: any;
 
-(function() {
+ (function() {
   let scene: any, camera: any, renderer: any;
   // Number of trees to display in the forest (initially sparse)
   const treeCount = 20;
   // Maximum number of trees as density increases
   const maxTreeCount = 150;
-  // Time interval (sec) between adding new trees to increase density
-  const densityInterval = 2;  // faster interval for denser forest
+  // Time interval (sec) between adding new trees to increase density (decreases per level)
+  const START_DENSITY_INTERVAL = 2;  // starting interval for density increase
+  let densityInterval = START_DENSITY_INTERVAL;
   // Number of trees to add each interval
   const treesPerInterval = 2;
   // Track last time density was increased
@@ -20,10 +21,14 @@ declare const THREE: any;
   // Range along Z-axis where trees and boxes spawn (further range = larger area)
   const spawnMinZ = 200;
   const spawnMaxZ = 400;
-  // Base forward speed (units per second)
-  const initialSpeed = 50;
+  // Base forward speed (units per second) (increases per level)
+  const START_SPEED = 50;
+  let initialSpeed = START_SPEED;
   // Rate at which speed increases (units per second per second)
   const speedIncreaseRate = 0.1;
+  // Difficulty bumps per level
+  const SPEED_LEVEL_INCREMENT = 10;
+  const DENSITY_LEVEL_MULTIPLIER = 0.9;
   // Snow particle system settings
   const snowCount = 1000;
   const snowFallSpeed = 20;
@@ -43,6 +48,16 @@ declare const THREE: any;
   const snowmanInterval = 15;     // seconds between snowmen
   let lastSnowmanTime = 0;
   const snowmanPool: any[] = [];
+  // Barrier settings
+  const barrierThickness = 1;
+  const barrierHeight = 2;
+  const barrierSegmentLength = 20;
+  const barrierCountPerSide = 10;
+  const barrierTextChance = 0.3;
+  let barrierPool: any[] = [];
+  // Level tracking for course progression
+  let level = 1;
+  let gatesSpawned = 0;
   let playerX = 0;
   let playerVx = 0;
   const playerSpeed = 20;
@@ -66,6 +81,9 @@ declare const THREE: any;
     highScore = 0;
   }
   highScoreElement.innerText = `High Score: ${highScore}`;
+  // Level display element
+  const levelElement = document.getElementById('level')!;
+  levelElement.innerText = `Level: ${level}`;
   // Audio context and success sound for collecting boxes
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   // Play a 'katching' sound when collecting a present
@@ -199,6 +217,15 @@ declare const THREE: any;
     const snowMaterial = new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.5, transparent: true, opacity: 0.8 });
     snowParticles = new THREE.Points(snowGeometry, snowMaterial);
     scene.add(snowParticles);
+    // Initialize barrier segments on both sides
+    for (let i = 0; i < barrierCountPerSide; i++) {
+      const leftBarrier = createBarrierSegment('left');
+      scene.add(leftBarrier);
+      barrierPool.push(leftBarrier);
+      const rightBarrier = createBarrierSegment('right');
+      scene.add(rightBarrier);
+      barrierPool.push(rightBarrier);
+    }
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
@@ -242,6 +269,57 @@ declare const THREE: any;
     box.userData.active = true;
     box.visible = true;
   }
+  
+  // Generate a canvas texture for barrier segments with optional text
+  function makeBarrierTexture(withText: boolean): any {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const w = canvas.width, h = canvas.height;
+      const stripeCount = 8;
+      const stripeWidth = Math.ceil(w / stripeCount);
+      for (let i = 0; i < stripeCount; i++) {
+        ctx.fillStyle = (i % 2 === 0) ? '#DDDDDD' : '#87CEEB';
+        ctx.fillRect(i * stripeWidth, 0, stripeWidth, h);
+      }
+      if (withText) {
+        ctx.font = 'bold 48px Arial';
+        ctx.fillStyle = '#000000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const texts = ['Merefield Technology', 'https://merefield.tech'];
+        const text = texts[Math.floor(Math.random() * texts.length)];
+        ctx.fillText(text, w / 2, h / 2);
+      }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    return texture;
+  }
+  
+  // Reset barrier position along Z and X based on side
+  function resetBarrier(barrier: any) {
+    const offsetX = laneWidth + barrierThickness / 2;
+    barrier.position.x = (barrier.userData.side === 'left') ? -offsetX : offsetX;
+    barrier.position.z = THREE.MathUtils.randFloat(spawnMinZ, spawnMaxZ);
+  }
+  
+  // Create a barrier segment mesh for given side
+  function createBarrierSegment(side: 'left' | 'right'): any {
+    const withText = Math.random() < barrierTextChance;
+    const texture = makeBarrierTexture(withText);
+    const geo = new THREE.BoxGeometry(barrierThickness, barrierHeight, barrierSegmentLength);
+    const mat = new THREE.MeshLambertMaterial({ map: texture });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = barrierHeight / 2;
+    mesh.userData.side = side;
+    mesh.userData.withText = withText;
+    resetBarrier(mesh);
+    return mesh;
+  }
 
   // Create a present: red box with yellow ribbon cross
   function createPresent() {
@@ -270,7 +348,7 @@ declare const THREE: any;
     return group;
   }
   // Create a ski gate: two flags marking a gate the player must pass through
-  function createGate() {
+  function createGate(isLevelGate: boolean = false) {
     // Determine gate center X randomly within lane bounds
     const halfWidth = gateWidth / 2;
     const centerX = THREE.MathUtils.randFloatSpread((laneWidth - halfWidth) * 2);
@@ -278,7 +356,7 @@ declare const THREE: any;
     const rightX = centerX + halfWidth;
     const group = new THREE.Group();
     // Store gate data
-    group.userData = { leftX, rightX, passed: false };
+    group.userData = { leftX, rightX, passed: false, isLevelGate };
     // Pole material
     const poleMat = new THREE.MeshPhongMaterial({ color: 0x654321 });
     const poleGeo = new THREE.CylinderGeometry(gatePoleRadius, gatePoleRadius, gatePoleHeight);
@@ -290,16 +368,39 @@ declare const THREE: any;
     const rightPole = new THREE.Mesh(poleGeo, poleMat);
     rightPole.position.set(rightX, gatePoleHeight / 2, 0);
     group.add(rightPole);
-    // Flags
-    const flagGeo = new THREE.PlaneGeometry(gateFlagSize, gateFlagSize);
-    // Left flag (bright pink)
-    const leftFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0xFF1493, side: THREE.DoubleSide }));
-    leftFlag.position.set(leftX + gatePoleRadius + 0.01, gatePoleHeight * 0.75, 0);
-    group.add(leftFlag);
-    // Right flag (bright violet)
-    const rightFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0x9400D3, side: THREE.DoubleSide }));
-    rightFlag.position.set(rightX - gatePoleRadius - 0.01, gatePoleHeight * 0.75, 0);
-    group.add(rightFlag);
+    if (isLevelGate) {
+      // Banner gate: black banner with text
+      const bannerHeight = 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = 'bold 48px Arial';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Merefield Technology', canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const bannerMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+      const bannerGeo = new THREE.PlaneGeometry(gateWidth, bannerHeight);
+      const banner = new THREE.Mesh(bannerGeo, bannerMat);
+      // Position and orient the banner so the front face faces the camera
+      banner.position.set(centerX, gatePoleHeight + bannerHeight / 2, 0);
+      banner.rotation.y = Math.PI;
+      group.add(banner);
+    } else {
+      // Flags
+      const flagGeo = new THREE.PlaneGeometry(gateFlagSize, gateFlagSize);
+      const leftFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0xFF1493, side: THREE.DoubleSide }));
+      leftFlag.position.set(leftX + gatePoleRadius + 0.01, gatePoleHeight * 0.75, 0);
+      group.add(leftFlag);
+      const rightFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0x9400D3, side: THREE.DoubleSide }));
+      rightFlag.position.set(rightX - gatePoleRadius - 0.01, gatePoleHeight * 0.75, 0);
+      group.add(rightFlag);
+    }
     return group;
   }
   // Create a snowman: two spheres (body and head)
@@ -402,6 +503,13 @@ declare const THREE: any;
         }
       }
     }
+    // Move barrier segments
+    for (const barrier of barrierPool) {
+      barrier.position.z -= currentSpeed * dt;
+      if (barrier.position.z < -10) {
+        resetBarrier(barrier);
+      }
+    }
 
     timeAlive += dt;
     const score = Math.floor(timeAlive) + bonusPoints;
@@ -446,7 +554,9 @@ declare const THREE: any;
     // Spawn a new ski gate at intervals
     if (totalDistance - lastGateDistance >= gateSpacing) {
       lastGateDistance += gateSpacing;
-      const gate = createGate();
+      gatesSpawned++;
+      const isLevelGate = (gatesSpawned % 5 === 0);
+      const gate = createGate(isLevelGate);
       gate.position.z = spawnMaxZ + gateSpawnOffset;
       scene.add(gate);
       gatePool.push(gate);
@@ -464,8 +574,18 @@ declare const THREE: any;
           endGame('Missed a gate!');
         } else {
           // Successful gate pass
-          playGateSuccessSound();
-        }
+          if (gate.userData.isLevelGate) {
+            // Level completion banner gate
+            playGateSuccessSound();
+            level++;
+            levelElement.innerText = `Level: ${level}`;
+            // Increase difficulty
+            initialSpeed += SPEED_LEVEL_INCREMENT;
+            densityInterval = Math.max(0.5, densityInterval * DENSITY_LEVEL_MULTIPLIER);
+          } else {
+            playGateSuccessSound();
+          }
+        } // close gate.pass check else-block
         gate.userData.passed = true;
       }
       // Remove gates that have moved past view
@@ -569,7 +689,7 @@ declare const THREE: any;
                   'Content-Type': 'application/json',
                   'X-API-Key': process.env.HIGH_SCORES_TOKEN || ''
                 },
-                body: JSON.stringify({ name, score: finalScore }),
+                body: JSON.stringify({ name, score: finalScore, level }),
               });
               console.log('[DEBUG] showHighScoresBoard: POST response status:', postResp.status);
               if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
@@ -596,7 +716,7 @@ declare const THREE: any;
                 'Content-Type': 'application/json',
                 'X-API-Key': process.env.HIGH_SCORES_TOKEN || ''
               },
-              body: JSON.stringify({ name: storedName, score: finalScore }),
+              body: JSON.stringify({ name: storedName, score: finalScore, level }),
             });
             console.log('[DEBUG] showHighScoresBoard: auto-submit POST response status:', postResp.status);
             if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
@@ -616,7 +736,7 @@ declare const THREE: any;
   }
 
   // Helper to render scores table
-  function renderScoresTable(container: HTMLElement, scores: Array<{name: string, score: number}>) {
+  function renderScoresTable(container: HTMLElement, scores: Array<{name: string, score: number, level?: number}>) {
     let title = container.querySelector('h3');
     if (!title) {
       title = document.createElement('h3');
@@ -632,7 +752,7 @@ declare const THREE: any;
     // Add table header for clarity
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Rank', 'Name', 'Score'].forEach(text => {
+    ['Rank', 'Name', 'Score', 'Level'].forEach(text => {
       const th = document.createElement('th');
       th.innerText = text;
       headerRow.appendChild(th);
@@ -648,6 +768,9 @@ declare const THREE: any;
       tr.appendChild(rankTd);
       tr.appendChild(nameTd);
       tr.appendChild(scoreTd);
+      // Level column
+      const levelTd = document.createElement('td'); levelTd.innerText = String((entry as any).level || '');
+      tr.appendChild(levelTd);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -662,6 +785,12 @@ declare const THREE: any;
     playerX = 0;
     playerVx = 0;
     gameOverElement.classList.add('hidden');
+    // Reset level and difficulty
+    level = 1;
+    gatesSpawned = 0;
+    initialSpeed = START_SPEED;
+    densityInterval = START_DENSITY_INTERVAL;
+    levelElement.innerText = `Level: ${level}`;
     // Reset tree density and gates
     treePool.forEach(tree => scene.remove(tree));
     treePool.length = 0;

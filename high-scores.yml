@@ -1,4 +1,5 @@
+- name: Dog
+  score: 80
+  level: 2
 - name: Robert
   score: 46
-- name: Dog
-  score: 4

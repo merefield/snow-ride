@@ -28,13 +28,15 @@ serve(async (req) => {
   // High-scores API: fetch top 3 via GET, submit new via POST
   if (path === "/api/high-scores") {
     if (req.method === "GET") {
-      let scores: Array<{ name: string; score: number }> = [];
+      // Ensure level field exists (default to 1)
+      let scores: Array<any> = [];
       try {
         const yml = await Deno.readTextFile("high-scores.yml");
         const parsed = parse(yml);
         if (Array.isArray(parsed)) scores = parsed as any;
       } catch {}
-      console.log("[DEBUG] server: GET /api/high-scores, returning scores:", JSON.stringify(scores));
+      scores = scores.map((s: any) => ({ name: s.name, score: s.score, level: typeof s.level === 'number' ? s.level : 1 }));
+      console.log("[DEBUG] server: GET /api/high-scores, returning scores with levels:", JSON.stringify(scores));
       return new Response(JSON.stringify(scores), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (req.method === "POST") {
@@ -47,27 +49,28 @@ serve(async (req) => {
       let payload: any;
       try { payload = await req.json(); } catch { return new Response("Invalid JSON", { status: 400 }); }
       console.log("[DEBUG] server: received POST /api/high-scores with payload:", JSON.stringify(payload));
-      const { name, score } = payload;
-      if (typeof name !== "string" || typeof score !== "number") {
+      const { name, score, level } = payload;
+      if (typeof name !== "string" || typeof score !== "number" || typeof level !== "number") {
         return new Response("Invalid data", { status: 400 });
       }
       // Load existing top scores
-      let scores: Array<{ name: string; score: number }> = [];
+      let scores: Array<any> = [];
       try {
         const yml = await Deno.readTextFile("high-scores.yml");
         const parsed = parse(yml);
         if (Array.isArray(parsed)) scores = parsed as any;
       } catch {}
       console.log("[DEBUG] server: existing high-scores before update:", JSON.stringify(scores));
-      // Update or insert player's score
+      // Update or insert player's score and level
       const existingIndex = scores.findIndex(s => s.name === name);
       if (existingIndex >= 0) {
         // Only overwrite if new score is higher
         if (score > scores[existingIndex].score) {
           scores[existingIndex].score = score;
+          scores[existingIndex].level = level;
         }
       } else {
-        scores.push({ name, score });
+        scores.push({ name, score, level });
       }
       // Sort and retain top 3
       scores.sort((a, b) => b.score - a.score);
