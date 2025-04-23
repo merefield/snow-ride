@@ -227,10 +227,10 @@ declare const THREE: any;
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
-    // Mobile tilt controls (DeviceOrientation)
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', onDeviceOrientation);
-    }
+    // Mobile touch controls: tap left/right half of screen
+    document.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchmove', onTouchStart, { passive: false });
+    document.addEventListener('touchend', onTouchEnd, { passive: false });
 
     restartButton.addEventListener('click', resetGame);
 
@@ -443,25 +443,22 @@ declare const THREE: any;
     if ((e.key === 'ArrowLeft' || e.key === 'a') && playerVx > 0) playerVx = 0;
     if ((e.key === 'ArrowRight' || e.key === 'd') && playerVx < 0) playerVx = 0;
   }
-  // Handle mobile tilt for lateral control
-  function onDeviceOrientation(event: DeviceOrientationEvent) {
-    const gamma = event.gamma ?? 0;
-    const absGamma = Math.abs(gamma);
-    let factor = 0;
-    if (absGamma > 30) {
-      factor = 1;
-    } else if (absGamma > 15) {
-      factor = 0.6;
-    } else if (absGamma > 5) {
-      factor = 0.3;
-    }
-    if (gamma > 0) {
-      playerVx = playerSpeed * factor;
-    } else if (gamma < 0) {
-      playerVx = -playerSpeed * factor;
+  // Mobile touch controls: left/right half of screen
+  function onTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    if (gameOver) return;
+    const x = e.touches[0].clientX;
+    if (x < window.innerWidth / 2) {
+      // Left half => ArrowLeft equivalent
+      playerVx = playerSpeed;
     } else {
-      playerVx = 0;
+      // Right half => ArrowRight equivalent
+      playerVx = -playerSpeed;
     }
+  }
+  function onTouchEnd(e: TouchEvent) {
+    e.preventDefault();
+    playerVx = 0;
   }
 
   function animate() {
