@@ -6,13 +6,10 @@ declare const THREE: any;
   const treeCount = 20;
   // Maximum number of trees as density increases
   const maxTreeCount = 150;
-  // Time interval (sec) between adding new trees to increase density (decreases per level)
-  const START_DENSITY_INTERVAL = 2;  // starting interval for density increase
-  let densityInterval = START_DENSITY_INTERVAL;
-  // Number of trees to add each interval
-  const treesPerInterval = 2;
-  // Track last time density was increased
-  let lastDensityIncrease = 0;
+  // Number of trees to add at each level gate
+  let treesPerInterval = 1;
+  // Amount to increase treesPerInterval at each level gate
+  const TREES_PER_INTERVAL_INCREMENT = 1;
   // Number of red boxes (presents) to spawn (reduced for more scarcity)
   const boxCount = 8;
   // Horizontal half-width of the forest (player X range and spawn zone half-width)
@@ -21,15 +18,11 @@ declare const THREE: any;
   // Range along Z-axis where trees and boxes spawn (further range = larger area)
   const spawnMinZ = 200;
   const spawnMaxZ = 400;
-  // Base forward speed (units per second) (increases per level)
+  // Base forward speed (units per second), decreased by 20% (from 50 to 40)
   const START_SPEED = 50;
-  let initialSpeed = START_SPEED;
-  // Rate at which speed increases continuously (units per second per second)
-  // Disabled to avoid speed ramp between level gates
-  const speedIncreaseRate = 0;
-  // Difficulty bumps per level gate
-  const SPEED_LEVEL_INCREMENT = 5;       // smaller speed increase at each level gate
-  const DENSITY_LEVEL_MULTIPLIER = 0.95;  // less aggressive tree density increase per level gate
+  let currentSpeed = START_SPEED;
+  // Difficulty bumps per level gate: increase speed and spawn more trees
+  const SPEED_LEVEL_INCREMENT = 2;
   // Snow particle system settings
   const snowCount = 1000;
   const snowFallSpeed = 20;
@@ -473,8 +466,6 @@ declare const THREE: any;
     const now = performance.now();
     const dt = (now - lastTime) / 1000;
     lastTime = now;
-    // Compute increasing speed over time
-    const currentSpeed = initialSpeed + speedIncreaseRate * timeAlive;
     // Update snow particle positions (falling effect)
     const posAttr = snowParticles.geometry.attributes.position as any;
     const sp = posAttr.array as Float32Array;
@@ -563,16 +554,6 @@ declare const THREE: any;
       }
     }
     scoreElement.innerText = `Score: ${score}`;
-    // Gradually increase tree density over time
-    if (timeAlive - lastDensityIncrease >= densityInterval && treePool.length < maxTreeCount) {
-      lastDensityIncrease += densityInterval;
-      for (let i = 0; i < treesPerInterval && treePool.length < maxTreeCount; i++) {
-        const newTree = createTree();
-        resetTree(newTree);
-        scene.add(newTree);
-        treePool.push(newTree);
-      }
-    }
     // Advance total distance to manage gate spawning
     totalDistance += currentSpeed * dt;
     // Spawn a new ski gate at intervals
@@ -604,8 +585,16 @@ declare const THREE: any;
             level++;
             levelElement.innerText = `Level: ${level}`;
             // Increase difficulty
-            initialSpeed += SPEED_LEVEL_INCREMENT;
-            densityInterval = Math.max(0.5, densityInterval * DENSITY_LEVEL_MULTIPLIER);
+            currentSpeed += SPEED_LEVEL_INCREMENT;
+            // Increase number of trees to spawn per gate
+            treesPerInterval += TREES_PER_INTERVAL_INCREMENT;
+            // Spawn new trees for this level gate
+            for (let i = 0; i < treesPerInterval && treePool.length < maxTreeCount; i++) {
+              const newTree = createTree();
+              resetTree(newTree);
+              scene.add(newTree);
+              treePool.push(newTree);
+            }
           } else {
             playGateSuccessSound();
           }
@@ -812,13 +801,11 @@ declare const THREE: any;
     // Reset level and difficulty
     level = 1;
     gatesSpawned = 0;
-    initialSpeed = START_SPEED;
-    densityInterval = START_DENSITY_INTERVAL;
+    currentSpeed = START_SPEED;
     levelElement.innerText = `Level: ${level}`;
     // Reset tree density and gates
     treePool.forEach(tree => scene.remove(tree));
     treePool.length = 0;
-    lastDensityIncrease = 0;
     for (let i = 0; i < treeCount; i++) {
       const tree = createTree();
       resetTree(tree);
