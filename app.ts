@@ -227,6 +227,10 @@ declare const THREE: any;
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
+    // Mobile tilt controls (DeviceOrientation)
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', onDeviceOrientation);
+    }
 
     restartButton.addEventListener('click', resetGame);
 
@@ -438,6 +442,26 @@ declare const THREE: any;
     // Stop movement on key release only if matching direction
     if ((e.key === 'ArrowLeft' || e.key === 'a') && playerVx > 0) playerVx = 0;
     if ((e.key === 'ArrowRight' || e.key === 'd') && playerVx < 0) playerVx = 0;
+  }
+  // Handle mobile tilt for lateral control
+  function onDeviceOrientation(event: DeviceOrientationEvent) {
+    const gamma = event.gamma ?? 0;
+    const absGamma = Math.abs(gamma);
+    let factor = 0;
+    if (absGamma > 30) {
+      factor = 1;
+    } else if (absGamma > 15) {
+      factor = 0.6;
+    } else if (absGamma > 5) {
+      factor = 0.3;
+    }
+    if (gamma > 0) {
+      playerVx = playerSpeed * factor;
+    } else if (gamma < 0) {
+      playerVx = -playerSpeed * factor;
+    } else {
+      playerVx = 0;
+    }
   }
 
   function animate() {
