@@ -39,4 +39,7 @@ serve(async (req) => {
   } catch {
     return new Response("Not Found", { status: 404 });
   }
-}, { port: 8000 });
+}, {
+  hostname: "0.0.0.0",
+  port: 8000
+});
