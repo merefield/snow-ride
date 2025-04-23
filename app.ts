@@ -24,11 +24,12 @@ declare const THREE: any;
   // Base forward speed (units per second) (increases per level)
   const START_SPEED = 50;
   let initialSpeed = START_SPEED;
-  // Rate at which speed increases (units per second per second)
-  const speedIncreaseRate = 0.1;
-  // Difficulty bumps per level
-  const SPEED_LEVEL_INCREMENT = 10;
-  const DENSITY_LEVEL_MULTIPLIER = 0.9;
+  // Rate at which speed increases continuously (units per second per second)
+  // Disabled to avoid speed ramp between level gates
+  const speedIncreaseRate = 0;
+  // Difficulty bumps per level gate
+  const SPEED_LEVEL_INCREMENT = 5;       // smaller speed increase at each level gate
+  const DENSITY_LEVEL_MULTIPLIER = 0.95;  // less aggressive tree density increase per level gate
   // Snow particle system settings
   const snowCount = 1000;
   const snowFallSpeed = 20;
