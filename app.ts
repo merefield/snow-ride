@@ -365,8 +365,8 @@ declare const THREE: any;
     rightPole.position.set(rightX, gatePoleHeight / 2, 0);
     group.add(rightPole);
     if (isLevelGate) {
-      // Banner gate: black banner with text
-      const bannerHeight = 1;
+      // Banner gate: black banner with text (taller banner, smaller font)
+      const bannerHeight = 1.2;
       const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 128;
@@ -374,8 +374,8 @@ declare const THREE: any;
       // Dark blue background for level-completion banners
       ctx.fillStyle = '#00008B';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Use larger font for level banner text
-      ctx.font = 'bold 64px Arial';
+      // Use smaller font for level banner text
+      ctx.font = 'bold 48px Arial';
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
