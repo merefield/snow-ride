@@ -542,7 +542,6 @@ declare const THREE: any;
       // Retrieve stored player name so we only ask once
       const storedName = localStorage.getItem('hsName') || '';
       console.log('[DEBUG] showHighScoresBoard: retrieved hsName from localStorage:', storedName);
-      console.log('[DEBUG] showHighScoresBoard: retrieved hsName from localStorage:', storedName);
       if (qualifies) {
         if (!storedName) {
           // First-time top-3: prompt for name
@@ -561,10 +560,9 @@ declare const THREE: any;
             try {
               // Store name locally to avoid re-prompting
               console.log('[DEBUG] showHighScoresBoard: about to set hsName in localStorage. Old:', localStorage.getItem('hsName'), 'New:', name);
-              console.log('[DEBUG] showHighScoresBoard: about to set hsName in localStorage. Old:', localStorage.getItem('hsName'), 'New:', name);
               localStorage.setItem('hsName', name);
               console.log('[DEBUG] showHighScoresBoard: localStorage hsName now:', localStorage.getItem('hsName'));
-              console.log('[DEBUG] showHighScoresBoard: localStorage hsName now:', localStorage.getItem('hsName'));
+              console.log('[DEBUG] showHighScoresBoard: submitting new high score, name:', name, 'score:', finalScore);
               const postResp = await fetch('/api/high-scores', {
                 method: 'POST',
                 headers: {
@@ -573,12 +571,15 @@ declare const THREE: any;
                 },
                 body: JSON.stringify({ name, score: finalScore }),
               });
+              console.log('[DEBUG] showHighScoresBoard: POST response status:', postResp.status);
               if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
               scores = await postResp.json();
+              console.log('[DEBUG] showHighScoresBoard: updated scores from POST:', scores);
               renderScoresTable(container, scores);
               input.disabled = true;
               submitBtn.disabled = true;
             } catch (err) {
+              console.error('[DEBUG] showHighScoresBoard: error saving score:', err);
               alert('Failed to save score');
             }
           });
@@ -588,6 +589,7 @@ declare const THREE: any;
           info.innerText = `Submitting your score as ${storedName}`;
           container.appendChild(info);
           try {
+            console.log('[DEBUG] showHighScoresBoard: auto-submitting high score, name:', storedName, 'score:', finalScore);
             const postResp = await fetch('/api/high-scores', {
               method: 'POST',
               headers: {
@@ -596,9 +598,12 @@ declare const THREE: any;
               },
               body: JSON.stringify({ name: storedName, score: finalScore }),
             });
+            console.log('[DEBUG] showHighScoresBoard: auto-submit POST response status:', postResp.status);
             if (!postResp.ok) throw new Error(`HTTP ${postResp.status}`);
             scores = await postResp.json();
+            console.log('[DEBUG] showHighScoresBoard: auto-submit updated scores:', scores);
           } catch (err) {
+            console.error('[DEBUG] showHighScoresBoard: error auto-submitting score:', err);
             alert('Failed to save score');
           }
         }

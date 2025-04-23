@@ -34,6 +34,7 @@ serve(async (req) => {
         const parsed = parse(yml);
         if (Array.isArray(parsed)) scores = parsed as any;
       } catch {}
+      console.log("[DEBUG] server: GET /api/high-scores, returning scores:", JSON.stringify(scores));
       return new Response(JSON.stringify(scores), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (req.method === "POST") {
@@ -45,6 +46,7 @@ serve(async (req) => {
       }
       let payload: any;
       try { payload = await req.json(); } catch { return new Response("Invalid JSON", { status: 400 }); }
+      console.log("[DEBUG] server: received POST /api/high-scores with payload:", JSON.stringify(payload));
       const { name, score } = payload;
       if (typeof name !== "string" || typeof score !== "number") {
         return new Response("Invalid data", { status: 400 });
@@ -56,6 +58,7 @@ serve(async (req) => {
         const parsed = parse(yml);
         if (Array.isArray(parsed)) scores = parsed as any;
       } catch {}
+      console.log("[DEBUG] server: existing high-scores before update:", JSON.stringify(scores));
       // Update or insert player's score
       const existingIndex = scores.findIndex(s => s.name === name);
       if (existingIndex >= 0) {
