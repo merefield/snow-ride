@@ -48,24 +48,6 @@ body, html {
   margin-top: 10px;
   font-size: 24px;
 }
-#mobileControls {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
-}
-#mobileControls button {
-  font-size: 2rem;
-  padding: 10px 20px;
-  margin: 0 20px;
-  opacity: 0.5;
-}
-@media (min-width: 768px) {
-  #mobileControls {
-    display: none;
-  }
-}
 /* High score display in top-right */
 #highScore {
   position: absolute;

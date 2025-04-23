@@ -69,8 +69,6 @@ declare const THREE: any;
   const scoreElement = document.getElementById('score')!;
   const gameOverElement = document.getElementById('gameOver')!;
   const restartButton = document.getElementById('restartButton')!;
-  const leftButton = document.getElementById('leftButton')!;
-  const rightButton = document.getElementById('rightButton')!;
   // High score display element and persisted value
   const highScoreElement = document.getElementById('highScore')!;
   const failReasonElement = document.getElementById('failReason')!;
@@ -229,12 +227,6 @@ declare const THREE: any;
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
-
-    // Swap touch controls: left should move left visually
-    leftButton.addEventListener('touchstart', () => { playerVx = playerSpeed; });
-    leftButton.addEventListener('touchend', () => { playerVx = 0; });
-    rightButton.addEventListener('touchstart', () => { playerVx = -playerSpeed; });
-    rightButton.addEventListener('touchend', () => { playerVx = 0; });
 
     restartButton.addEventListener('click', resetGame);
 
