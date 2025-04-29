@@ -169,22 +169,52 @@ declare const THREE: any;
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('view3d')!.appendChild(renderer.domElement);
 
     window.addEventListener('resize', onWindowResize);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    // ------------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------------
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(0, 10, 10);
+
+    // Key directional light – place it behind the player (−Z) and
+    // slightly to the right (+X) at an elevated Y so that objects in
+    // front of the player are lit and cast longish shadows **towards**
+    // the camera.
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    // Raise Y to shorten shadows (higher sun angle)
+    dir.position.set(15, 40, -20);
+    // Aim the light down-the-slope (positive Z-direction)
+    dir.target.position.set(0, 0, 50);
+    scene.add(dir.target);
+
+    // Enable shadows from this light
+    dir.castShadow = true;
+    dir.shadow.mapSize.width = 2048;
+    dir.shadow.mapSize.height = 2048;
+    // Widen the orthographic shadow camera so it covers the course
+    const shadowCamSize = laneWidth * 2;
+    (dir.shadow.camera as any).left = -shadowCamSize;
+    (dir.shadow.camera as any).right = shadowCamSize;
+    (dir.shadow.camera as any).top = shadowCamSize;
+    (dir.shadow.camera as any).bottom = -shadowCamSize;
+    dir.shadow.camera.near = 1;
+    dir.shadow.camera.far = spawnMaxZ + 100;
+    dir.shadow.bias = -0.0005;
     scene.add(dir);
 
     const groundGeo = new THREE.PlaneGeometry(2000, 2000, 8, 8);
     // White ground for snow
-    // Slightly grey snow ground
-    const groundMat = new THREE.MeshPhongMaterial({ color: 0xDDDDDD });
+    // Almost pure-white snow ground
+    const groundMat = new THREE.MeshPhongMaterial({ color: 0xFFFFFF, shininess: 2 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
     scene.add(ground);
 
     for (let i = 0; i < treeCount; i++) {
@@ -258,12 +288,14 @@ declare const THREE: any;
       new THREE.MeshPhongMaterial({ color: 0x8B4513 })
     );
     trunk.position.y = 2.5;
+    trunk.castShadow = true;
     group.add(trunk);
     const leaves = new THREE.Mesh(
       new THREE.ConeGeometry(2, 4),
       new THREE.MeshPhongMaterial({ color: 0x006400 })
     );
     leaves.position.y = 7;
+    leaves.castShadow = true;
     group.add(leaves);
     return group;
   }
@@ -325,6 +357,7 @@ declare const THREE: any;
     const mat = new THREE.MeshLambertMaterial({ map: texture });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = barrierHeight / 2;
+    mesh.castShadow = true;
     mesh.userData.side = side;
     mesh.userData.withText = withText;
     resetBarrier(mesh);
@@ -339,6 +372,7 @@ declare const THREE: any;
       new THREE.MeshPhongMaterial({ color: 0xff0000 })
     );
     boxMesh.position.y = 0.5;
+    boxMesh.castShadow = true;
     group.add(boxMesh);
     const ribbonMat = new THREE.MeshPhongMaterial({ color: 0xFFFF00 });
     // Ribbon along X-axis
@@ -347,6 +381,7 @@ declare const THREE: any;
       ribbonMat
     );
     ribbonX.position.set(0, 0.5, 0);
+    ribbonX.castShadow = true;
     group.add(ribbonX);
     // Ribbon along Z-axis
     const ribbonZ = new THREE.Mesh(
@@ -354,6 +389,7 @@ declare const THREE: any;
       ribbonMat
     );
     ribbonZ.position.set(0, 0.5, 0);
+    ribbonZ.castShadow = true;
     group.add(ribbonZ);
     return group;
   }
@@ -373,10 +409,12 @@ declare const THREE: any;
     // Left pole
     const leftPole = new THREE.Mesh(poleGeo, poleMat);
     leftPole.position.set(leftX, gatePoleHeight / 2, 0);
+    leftPole.castShadow = true;
     group.add(leftPole);
     // Right pole
     const rightPole = new THREE.Mesh(poleGeo, poleMat);
     rightPole.position.set(rightX, gatePoleHeight / 2, 0);
+    rightPole.castShadow = true;
     group.add(rightPole);
     if (isLevelGate) {
       // Banner gate: black banner with text (taller banner, smaller font)
@@ -407,15 +445,18 @@ declare const THREE: any;
       // Position and orient the banner so the front face faces the camera
       banner.position.set(centerX, gatePoleHeight + bannerHeight / 2, 0);
       banner.rotation.y = Math.PI;
+      banner.castShadow = true;
       group.add(banner);
     } else {
       // Flags
       const flagGeo = new THREE.PlaneGeometry(gateFlagSize, gateFlagSize);
       const leftFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0xFF1493, side: THREE.DoubleSide }));
       leftFlag.position.set(leftX + gatePoleRadius + 0.01, gatePoleHeight * 0.75, 0);
+      leftFlag.castShadow = true;
       group.add(leftFlag);
       const rightFlag = new THREE.Mesh(flagGeo, new THREE.MeshPhongMaterial({ color: 0x9400D3, side: THREE.DoubleSide }));
       rightFlag.position.set(rightX - gatePoleRadius - 0.01, gatePoleHeight * 0.75, 0);
+      rightFlag.castShadow = true;
       group.add(rightFlag);
     }
     return group;
@@ -427,10 +468,12 @@ declare const THREE: any;
     // Body
     const body = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), mat);
     body.position.y = 1;
+    body.castShadow = true;
     group.add(body);
     // Head
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), mat);
     head.position.y = 1 + 1 + 0.7;
+    head.castShadow = true;
     group.add(head);
     return group;
   }
