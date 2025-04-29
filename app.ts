@@ -55,6 +55,11 @@ declare const THREE: any;
   let playerX = 0;
   let playerVx = 0;
   const playerSpeed = 20;
+  // Gamepad state
+  let gamepadIndex: number | null = null;
+  // Deadzone for analog stick to ignore small drift
+  const GAMEPAD_DEADZONE = 0.15;
+
   let lastTime = performance.now();
   let timeAlive = 0;
   let bonusPoints = 0;
@@ -225,6 +230,21 @@ declare const THREE: any;
     document.addEventListener('touchstart', onTouchStart, { passive: false });
     document.addEventListener('touchmove', onTouchStart, { passive: false });
     document.addEventListener('touchend', onTouchEnd, { passive: false });
+
+    // Gamepad connection events
+    window.addEventListener('gamepadconnected', (e: GamepadEvent) => {
+      // Prefer the first connected gamepad, but allow re-selection on reconnect
+      if (gamepadIndex === null) {
+        gamepadIndex = e.gamepad.index;
+        console.log(`Gamepad connected at index ${gamepadIndex}: ${e.gamepad.id}`);
+      }
+    });
+    window.addEventListener('gamepaddisconnected', (e: GamepadEvent) => {
+      if (gamepadIndex === e.gamepad.index) {
+        console.log(`Gamepad disconnected from index ${gamepadIndex}: ${e.gamepad.id}`);
+        gamepadIndex = null;
+      }
+    });
 
     restartButton.addEventListener('click', resetGame);
 
@@ -466,6 +486,33 @@ declare const THREE: any;
     const now = performance.now();
     const dt = (now - lastTime) / 1000;
     lastTime = now;
+
+    // ------------------------------------------------------------------
+    // Gamepad handling (analog steering)
+    // ------------------------------------------------------------------
+    if (gamepadIndex !== null) {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : null;
+      const gp = gamepads && gamepads[gamepadIndex];
+      if (gp) {
+        // Typically left stick horizontal axis is axes[0]
+        const axisX = gp.axes[0] || 0;
+        const magnitude = Math.abs(axisX);
+        if (magnitude > GAMEPAD_DEADZONE) {
+          // Scale axis outside the deadzone to full range (optional)
+          const sign = axisX > 0 ? 1 : -1;
+          const scaled = (magnitude - GAMEPAD_DEADZONE) / (1 - GAMEPAD_DEADZONE);
+          playerVx = -sign * scaled * playerSpeed;
+        } else {
+          // Within deadzone => no movement from stick (but don't override keyboard-induced velocity)
+          // Only clear if the velocity was previously set by gamepad (approx). When keyboard pressed,
+          // its velocity is exactly ±playerSpeed. We'll identify gamepad-set velocities as not exactly
+          // equal to ±playerSpeed.
+          if (Math.abs(playerVx) !== playerSpeed) {
+            playerVx = 0;
+          }
+        }
+      }
+    }
     // Update snow particle positions (falling effect)
     const posAttr = snowParticles.geometry.attributes.position as any;
     const sp = posAttr.array as Float32Array;

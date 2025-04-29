@@ -6,7 +6,7 @@ A fast-paced 3D endless runner game built with Three.js. Navigate through a fore
 
 ## How to Play
 
-Use arrow keys (⟵/⟶ or A/D) to move left or right. On mobile, use the on-screen controls. Survive as long as possible without colliding with trees. Collect red boxes for extra points.
+Use arrow keys (⟵/⟶ or A/D) or a connected game-pad’s left analogue stick to move left or right. On mobile, tap the left or right half of the screen. Survive as long as possible without colliding with trees. Collect red boxes for extra points.
 
 ## Running Locally
 
