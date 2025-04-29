@@ -65,6 +65,9 @@ declare const THREE: any;
   let bonusPoints = 0;
   let gameOver = false;
 
+  // Track previous A-button state to detect edge transition when game is over
+  let prevAButtonPressed = false;
+
   const scoreElement = document.getElementById('score')!;
   const gameOverElement = document.getElementById('gameOver')!;
   const restartButton = document.getElementById('restartButton')!;
@@ -736,6 +739,9 @@ declare const THREE: any;
       failReasonElement.innerText = reason;
     }
     gameOverElement.classList.remove('hidden');
+
+    // Start polling gamepad for A-button to restart
+    waitForRestart();
     // At game end, display server-side high scores
     const finalScore = Math.floor(timeAlive) + bonusPoints;
     showHighScoresBoard(finalScore);
@@ -913,10 +919,34 @@ declare const THREE: any;
     snowmanPool.forEach(s => scene.remove(s));
     snowmanPool.length = 0;
     lastSnowmanTime = 0;
+    // Reset previous A-button state so stale press doesn't auto-repeat
+    prevAButtonPressed = false;
     // Restart animation loop
     // Clear any previous failure reason
     failReasonElement.innerText = '';
     animate();
+  }
+
+  /**
+   * While the game is over and the restart overlay is visible, keep polling the
+   * connected game-pad. If the A button (index 0 under the standard mapping)
+   * transitions from up→down, invoke `resetGame()`.
+   */
+  function waitForRestart() {
+    if (!gameOver) return; // exited already
+    requestAnimationFrame(waitForRestart);
+
+    if (gamepadIndex === null) return;
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : null;
+    const gp = gamepads && gamepads[gamepadIndex];
+    if (!gp) return;
+    const aPressed = gp.buttons[0]?.pressed || false;
+    if (aPressed && !prevAButtonPressed) {
+      // Edge: button just pressed
+      resetGame();
+      return; // resetGame will flip gameOver → false, the recursion will stop next frame
+    }
+    prevAButtonPressed = aPressed;
   }
 
   init();
