@@ -59,6 +59,8 @@ declare const THREE: any;
   let gamepadIndex: number | null = null;
   // Deadzone for analog stick to ignore small drift
   const GAMEPAD_DEADZONE = 0.15;
+  // Allow analogue steering to slightly exceed keyboard speed at full deflection
+  const GAMEPAD_SPEED_MULTIPLIER = 1.25;
 
   let lastTime = performance.now();
   let timeAlive = 0;
@@ -547,7 +549,7 @@ declare const THREE: any;
           // Scale axis outside the deadzone to full range (optional)
           const sign = axisX > 0 ? 1 : -1;
           const scaled = (magnitude - GAMEPAD_DEADZONE) / (1 - GAMEPAD_DEADZONE);
-          playerVx = -sign * scaled * playerSpeed;
+          playerVx = -sign * scaled * playerSpeed * GAMEPAD_SPEED_MULTIPLIER;
         } else {
           // Within deadzone => no movement from stick (but don't override keyboard-induced velocity)
           // Only clear if the velocity was previously set by gamepad (approx). When keyboard pressed,
