@@ -194,7 +194,8 @@ import THREE from "./deps_client.ts";
     // slightly to the right (+X) at an elevated Y so that objects in
     // front of the player are lit and cast longish shadows **towards**
     // the camera.
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    // Brighten further – double again (3.2 → 6.4) for even clearer shadows.
+    const dir = new THREE.DirectionalLight(0xffffff, 6.4);
     // Raise Y to shorten shadows (higher sun angle)
     dir.position.set(15, 40, -20);
     // Aim the light down-the-slope (positive Z-direction)

@@ -7,5 +7,6 @@
 // through the familiar `THREE` identifier.
 
 // Three.js via jsDelivr CDN. Keep the version in sync with game code.
-import * as THREE_NS from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
+// r176 / 0.176.0
+import * as THREE_NS from "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.module.js";
 export default THREE_NS;
