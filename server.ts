@@ -1,7 +1,4 @@
-import { serve } from "https://deno.land/std@0.171.0/http/server.ts";
-import { serveFile } from "https://deno.land/std@0.171.0/http/file_server.ts";
-import { build } from "https://deno.land/x/esbuild@v0.17.19/mod.js";
-import { parse, stringify } from "https://deno.land/std@0.171.0/encoding/yaml.ts";
+import { serve, serveFile, build, parse, stringify } from "./deps.ts";
 
 // Load environment variables from .env file into Deno.env
 try {
@@ -78,7 +75,7 @@ serve(async (req) => {
       // Persist updated high-scores
       try {
         console.log("[DEBUG] server: persisting updated high-scores with data:", JSON.stringify(scores));
-        await Deno.writeTextFile("high-scores.yml", stringify(scores));
+        await Deno.writeTextFile("high-scores.yml", stringify(scores as unknown as Record<string, unknown>[]));
         console.log("[DEBUG] server: successfully wrote high-scores.yml");
       } catch (err) {
         console.error("Failed to write high-scores.yml:", err);

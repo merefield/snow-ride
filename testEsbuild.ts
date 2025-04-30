@@ -1,4 +1,4 @@
-import { build, stop } from 'https://deno.land/x/esbuild@v0.17.19/mod.js';
+import { build, stop } from './deps.ts';
 const result = await build({
   entryPoints: ['app.ts'],
   bundle: true,

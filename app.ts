@@ -1,4 +1,7 @@
-declare const THREE: any;
+// Import only the browser-side dependencies. Using a separate deps file keeps
+// server-side libraries (Deno std, esbuild, etc.) out of the client bundle so
+// the browser downloads a much smaller file.
+import THREE from "./deps_client.ts";
 
  (function() {
   let scene: any, camera: any, renderer: any;
